@@ -1,0 +1,206 @@
+:host {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.home {
+  flex: 1;
+  overflow-y: auto;
+  background: #282c34;
+  padding: 40px 48px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a transparent;
+
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  max-width: 860px;
+}
+
+.home-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #cccccc;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.home-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.search-btn,
+.new-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: #858585;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #cccccc;
+    border-color: #555;
+  }
+}
+
+// ── Tag filters ───────────────────────────────────────────────────────────────
+
+.tag-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+  max-width: 860px;
+}
+
+.tag-filter {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: #858585;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+
+  &:hover {
+    border-color: #555;
+    color: #aaaaaa;
+  }
+
+  &.active {
+    background: #094771;
+    border-color: #0e639c;
+    color: #cccccc;
+  }
+}
+
+// ── Notes list ────────────────────────────────────────────────────────────────
+
+.notes-list {
+  max-width: 860px;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.note-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2d2d2d;
+  cursor: pointer;
+  transition: background 0.08s;
+  gap: 16px;
+  outline: none;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover,
+  &:focus {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.note-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.note-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cccccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-bubble {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid #3a3a3a;
+  background: #2d2d2d;
+  color: #858585;
+  font-size: 11px;
+  font-family: inherit;
+  white-space: nowrap;
+
+  &.overflow {
+    color: #6a6a6a;
+    background: transparent;
+    border-color: #2d2d2d;
+  }
+}
+
+.note-date {
+  font-size: 12px;
+  color: #6a6a6a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  color: #454545;
+
+  svg {
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+
+  p {
+    font-size: 13px;
+    color: #555;
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  kbd {
+    background: #2d2d2d;
+    border: 1px solid #454545;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: #858585;
+  }
+}

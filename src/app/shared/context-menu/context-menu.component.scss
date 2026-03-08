@@ -1,0 +1,138 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: auto;
+}
+
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+}
+
+.ctx-menu {
+  position: fixed;
+  min-width: 180px;
+  max-width: 280px;
+  background: #2d2d2d;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  z-index: 2001;
+}
+
+@keyframes ctxIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ctx-divider {
+  height: 1px;
+  background: #454545;
+  margin: 4px 8px;
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: #cccccc;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: background 0.08s;
+  outline: none;
+
+  &:hover:not(.disabled) {
+    background: #094771;
+  }
+
+  &.danger {
+    color: #f14c4c;
+
+    .ctx-icon {
+      color: #f14c4c;
+    }
+
+    &:hover:not(.disabled) {
+      background: rgba(241, 76, 76, 0.15);
+    }
+  }
+
+  &.disabled {
+    color: #5a5a5a;
+    cursor: default;
+
+    .ctx-icon {
+      color: #5a5a5a;
+    }
+  }
+}
+
+.ctx-icon {
+  color: #858585;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.ctx-icon-spacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.ctx-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ctx-shortcut {
+  font-size: 11px;
+  color: #6a6a6a;
+  background: transparent;
+  border: none;
+  font-family: 'Consolas', monospace;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.ctx-chevron {
+  color: #6a6a6a;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+// ── Submenu ──────────────────────────────────────────────────────────────────
+
+.ctx-submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  min-width: 160px;
+  background: #2d2d2d;
+  border: 1px solid #454545;
+  border-radius: 8px;
+  padding: 4px 0;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: ctxIn 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}

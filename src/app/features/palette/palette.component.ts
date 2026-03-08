@@ -1,13 +1,13 @@
 import {
-  Component, inject, OnInit, OnDestroy, signal, computed,
-  ViewChild, ElementRef, AfterViewInit, ChangeDetectionStrategy
+  Component, inject, OnDestroy, signal, computed, effect,
+  ViewChild, ElementRef, ChangeDetectionStrategy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PaletteService } from '../../core/services/palette.service';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
-import { PaletteResult, NotePreview } from '../../core/models/note.model';
+import { PaletteResult } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-palette',
@@ -106,7 +106,7 @@ import { PaletteResult, NotePreview } from '../../core/models/note.model';
   `,
   styleUrls: ['./palette.component.scss'],
 })
-export class PaletteComponent implements OnInit, OnDestroy, AfterViewInit {
+export class PaletteComponent implements OnDestroy {
   private palette = inject(PaletteService);
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
@@ -123,8 +123,6 @@ export class PaletteComponent implements OnInit, OnDestroy, AfterViewInit {
   readonly results = this._results.asReadonly();
 
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
-  private openWatcher: ReturnType<typeof setInterval> | null = null;
-  private wasOpen = false;
 
   readonly placeholder = computed(() => {
     switch (this.mode()) {
@@ -179,31 +177,26 @@ export class PaletteComponent implements OnInit, OnDestroy, AfterViewInit {
     ];
   }
 
-  ngOnInit(): void {
-    // Watch for open state changes via polling (lightweight)
-    this.openWatcher = setInterval(() => {
+  constructor() {
+    // React to open/close state changes via Angular effect (replaces setInterval polling)
+    effect(() => {
       const open = this.isOpen();
-      if (open && !this.wasOpen) {
+      if (open) {
         this.query = this.palette.initialQuery();
         setTimeout(() => {
           this.inputEl?.nativeElement.focus();
           this.inputEl?.nativeElement.select();
         }, 50);
         this.onQueryChange(this.query);
-      }
-      if (!open && this.wasOpen) {
+      } else {
         this.query = '';
         this._results.set([]);
         this.selectedIndex.set(0);
       }
-      this.wasOpen = open;
-    }, 50);
+    });
   }
 
-  ngAfterViewInit(): void {}
-
   ngOnDestroy(): void {
-    if (this.openWatcher) clearInterval(this.openWatcher);
     if (this.searchDebounce) clearTimeout(this.searchDebounce);
   }
 

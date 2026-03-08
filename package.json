@@ -1,6 +1,7 @@
+
 {
-  "name": "ev-note",
-  "version": "0.0.0",
+  "name": "everything-note",
+  "version": "0.0.8",
   "description": "Fast, keyboard-driven note-taking app",
   "main": "dist-electron/main.js",
   "private": true,
@@ -53,8 +54,8 @@
     "wait-on": "^8.0.3"
   },
   "build": {
-    "appId": "com.evnote.app",
-    "productName": "EvNote",
+    "appId": "com.everything.note",
+    "productName": "Everything Note",
     "directories": {
       "output": "release"
     },
@@ -63,7 +64,8 @@
       "dist-electron/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/logo.ico"
     }
   }
 }

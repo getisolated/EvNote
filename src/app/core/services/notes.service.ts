@@ -2,6 +2,18 @@ import { Injectable, signal, computed } from '@angular/core';
 import { Note, NotePreview } from '../models/note.model';
 import { ElectronBridgeService } from './electron-bridge.service';
 
+const PREVIEW_MAX_LENGTH = 120;
+
+function toPreview(n: Note): NotePreview {
+  return {
+    id: n.id,
+    title: n.title || 'Untitled',
+    tags: n.tags,
+    updatedAt: n.updatedAt,
+    preview: n.content.split('\n').slice(1).join(' ').slice(0, PREVIEW_MAX_LENGTH).trim(),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class NotesService {
   private readonly _notes = signal<Note[]>([]);
@@ -9,13 +21,7 @@ export class NotesService {
   readonly notes = this._notes.asReadonly();
 
   readonly notePreviews = computed<NotePreview[]>(() =>
-    this._notes().map(n => ({
-      id: n.id,
-      title: n.title || 'Untitled',
-      tags: n.tags,
-      updatedAt: n.updatedAt,
-      preview: n.content.split('\n').slice(1).join(' ').slice(0, 120).trim(),
-    }))
+    this._notes().map(toPreview)
   );
 
   constructor(private bridge: ElectronBridgeService) {}
@@ -53,24 +59,12 @@ export class NotesService {
   async search(query: string): Promise<NotePreview[]> {
     if (!query.trim()) return this.notePreviews();
     const results = await this.bridge.searchNotes(query);
-    return results.map(n => ({
-      id: n.id,
-      title: n.title || 'Untitled',
-      tags: n.tags,
-      updatedAt: n.updatedAt,
-      preview: n.content.split('\n').slice(1).join(' ').slice(0, 120).trim(),
-    }));
+    return results.map(toPreview);
   }
 
   async getByTag(tag: string): Promise<NotePreview[]> {
     const results = await this.bridge.getNotesByTag(tag);
-    return results.map(n => ({
-      id: n.id,
-      title: n.title || 'Untitled',
-      tags: n.tags,
-      updatedAt: n.updatedAt,
-      preview: n.content.split('\n').slice(1).join(' ').slice(0, 120).trim(),
-    }));
+    return results.map(toPreview);
   }
 
   async getAllTags(): Promise<string[]> {

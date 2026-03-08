@@ -51,6 +51,22 @@ export function initDatabase(): void {
   `);
 }
 
+export function closeDatabase(): void {
+  if (db) {
+    db.close();
+  }
+}
+
+/** Escapes special FTS5 characters so user input is treated as literal text. */
+function sanitizeFtsQuery(query: string): string {
+  return query
+    .trim()
+    .split(/\s+/)
+    .filter(token => token.length > 0)
+    .map(token => `"${token.replace(/"/g, '""')}"`)
+    .join(' ');
+}
+
 export const noteOps = {
   getAll(): NoteRow[] {
     return db.prepare(`SELECT * FROM notes ORDER BY updated_at DESC`).all() as NoteRow[];
@@ -91,18 +107,21 @@ export const noteOps = {
 
   search(query: string): NoteRow[] {
     if (!query.trim()) return this.getAll();
+    const sanitized = sanitizeFtsQuery(query);
+    if (!sanitized) return this.getAll();
     return db.prepare(`
       SELECT notes.* FROM notes
       JOIN notes_fts ON notes.id = notes_fts.rowid
       WHERE notes_fts MATCH ?
       ORDER BY rank
-    `).all(query.trim() + '*') as NoteRow[];
+    `).all(sanitized + '*') as NoteRow[];
   },
 
   getByTag(tag: string): NoteRow[] {
+    const sanitizedTag = tag.replace(/"/g, '');
     return db.prepare(`
       SELECT * FROM notes WHERE tags LIKE ? ORDER BY updated_at DESC
-    `).all(`%"${tag}"%`) as NoteRow[];
+    `).all(`%"${sanitizedTag}"%`) as NoteRow[];
   },
 
   getAllTags(): string[] {
@@ -112,7 +131,7 @@ export const noteOps = {
       try {
         const tags: string[] = JSON.parse(row.tags);
         tags.forEach(t => tagSet.add(t));
-      } catch { /* skip */ }
+      } catch { /* skip malformed tags */ }
     }
     return Array.from(tagSet).sort();
   }

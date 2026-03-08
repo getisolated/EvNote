@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
-import { initDatabase, noteOps } from './database';
+import { initDatabase, closeDatabase, noteOps } from './database';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 let mainWindow: BrowserWindow | null = null;
@@ -14,6 +14,7 @@ function createWindow(): void {
     frame: false,
     backgroundColor: '#1e1e1e',
     titleBarStyle: 'hidden',
+    icon: path.join(__dirname, '../assets/logo.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -46,28 +47,44 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
+app.on('before-quit', () => {
+  closeDatabase();
+});
+
+// Wraps an IPC handler with try-catch to prevent unhandled exceptions
+function safeHandle(channel: string, handler: (...args: any[]) => any): void {
+  ipcMain.handle(channel, async (...args) => {
+    try {
+      return await handler(...args);
+    } catch (err) {
+      console.error(`[IPC] Error in ${channel}:`, err);
+      throw err;
+    }
+  });
+}
+
 // ── Window controls ──────────────────────────────────────────────────────────
-ipcMain.handle('window:minimize', () => mainWindow?.minimize());
-ipcMain.handle('window:maximize', () => {
+safeHandle('window:minimize', () => mainWindow?.minimize());
+safeHandle('window:maximize', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
   else mainWindow?.maximize();
 });
-ipcMain.handle('window:close', () => mainWindow?.close());
-ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
+safeHandle('window:close', () => mainWindow?.close());
+safeHandle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
 
 // ── Notes CRUD ───────────────────────────────────────────────────────────────
-ipcMain.handle('notes:getAll', () => noteOps.getAll());
-ipcMain.handle('notes:getById', (_e, id: number) => noteOps.getById(id) ?? null);
-ipcMain.handle('notes:create', (_e, title: string, content: string) =>
+safeHandle('notes:getAll', () => noteOps.getAll());
+safeHandle('notes:getById', (_e, id: number) => noteOps.getById(id) ?? null);
+safeHandle('notes:create', (_e, title: string, content: string) =>
   noteOps.create(title, content)
 );
-ipcMain.handle('notes:update', (_e, id: number, data: { title?: string; content?: string; tags?: string }) =>
+safeHandle('notes:update', (_e, id: number, data: { title?: string; content?: string; tags?: string }) =>
   noteOps.update(id, data) ?? null
 );
-ipcMain.handle('notes:delete', (_e, id: number) => { noteOps.delete(id); return true; });
-ipcMain.handle('notes:search', (_e, query: string) => noteOps.search(query));
-ipcMain.handle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
-ipcMain.handle('notes:allTags', () => noteOps.getAllTags());
+safeHandle('notes:delete', (_e, id: number) => { noteOps.delete(id); return true; });
+safeHandle('notes:search', (_e, query: string) => noteOps.search(query));
+safeHandle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
+safeHandle('notes:allTags', () => noteOps.getAllTags());
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-ipcMain.handle('shell:openExternal', (_e, url: string) => shell.openExternal(url));
+safeHandle('shell:openExternal', (_e, url: string) => shell.openExternal(url));

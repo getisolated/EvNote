@@ -10,6 +10,9 @@ import { NotesService } from './core/services/notes.service';
 import { TabsService } from './core/services/tabs.service';
 import { PaletteService } from './core/services/palette.service';
 import { ShortcutsService } from './core/services/shortcuts.service';
+import { ElectronBridgeService } from './core/services/electron-bridge.service';
+import { LayoutService } from './core/services/layout.service';
+import { SAMPLE_NOTES } from './core/data/sample-notes';
 
 @Component({
   selector: 'app-root',
@@ -19,7 +22,7 @@ import { ShortcutsService } from './core/services/shortcuts.service';
   template: `
     <div class="app-shell">
       <app-tabs-bar />
-      <div class="app-content">
+      <div class="app-content" [class.wide]="wideMode()">
         <!-- Always keep both in DOM to avoid editor teardown on home navigation -->
         <app-home [style.display]="activeNoteId() !== null ? 'none' : 'flex'" />
         <app-editor
@@ -46,6 +49,12 @@ import { ShortcutsService } from './core/services/shortcuts.service';
       overflow: hidden;
       min-height: 0;
     }
+    .app-content.wide ::ng-deep .cm-content {
+      max-width: 100% !important;
+    }
+    .app-content.wide ::ng-deep .home-inner {
+      max-width: 100%;
+    }
   `],
 })
 export class AppComponent implements OnInit, OnDestroy {
@@ -55,17 +64,37 @@ export class AppComponent implements OnInit, OnDestroy {
   private tabsService = inject(TabsService);
   private paletteService = inject(PaletteService);
   private shortcutsService = inject(ShortcutsService);
+  private bridge = inject(ElectronBridgeService);
+  private layoutService = inject(LayoutService);
 
   readonly activeNoteId = this.tabsService.activeNoteId;
+  readonly wideMode = this.layoutService.wideMode;
 
   private unregisterFns: (() => void)[] = [];
 
   async ngOnInit(): Promise<void> {
-    await this.notesService.loadAll();
-    // Restore session, filtering out deleted notes
-    const noteIds = new Set(this.notesService.notes().map(n => n.id));
-    this.tabsService.restoreSession(noteIds);
+    try {
+      await this.notesService.loadAll();
+
+      // Seed sample notes on first launch
+      if (this.notesService.notes().length === 0) {
+        await this.seedSampleNotes();
+      }
+
+      const noteIds = new Set(this.notesService.notes().map(n => n.id));
+      this.tabsService.restoreSession(noteIds);
+    } catch (err) {
+      console.error('[App] Failed to load notes:', err);
+    }
     this.registerShortcuts();
+  }
+
+  private async seedSampleNotes(): Promise<void> {
+    for (const sample of SAMPLE_NOTES) {
+      const note = await this.bridge.createNote(sample.title, sample.content);
+      await this.bridge.updateNote(note.id, { title: sample.title, content: sample.content });
+    }
+    await this.notesService.loadAll();
   }
 
   ngOnDestroy(): void {
@@ -97,6 +126,9 @@ export class AppComponent implements OnInit, OnDestroy {
         else this.editorRef?.closeSearch();
       }
     });
+
+    reg({ key: 'z', alt: true, handler: () => this.layoutService.toggle() });
+    reg({ key: 'p', alt: true, handler: () => this.tabsService.togglePinActiveTab() });
 
     // Alt+Ctrl+1-9: switch to tab by index
     for (let i = 1; i <= 9; i++) {

@@ -1,24 +1,22 @@
 import {
-  Component, OnInit, OnDestroy, OnChanges, Input, SimpleChanges,
+  Component, OnDestroy, OnChanges, Input, SimpleChanges,
   ElementRef, ViewChild, inject, ChangeDetectionStrategy, NgZone, signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 
 // CodeMirror
-import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
-import { EditorState, Extension, Compartment } from '@codemirror/state';
+import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine } from '@codemirror/view';
+import { EditorState, Extension } from '@codemirror/state';
 import {
   defaultKeymap, history, historyKeymap, indentWithTab,
-  undo, redo, toggleComment
 } from '@codemirror/commands';
-import { searchKeymap, search, SearchQuery, setSearchQuery, openSearchPanel, closeSearchPanel } from '@codemirror/search';
+import { searchKeymap, search, openSearchPanel, closeSearchPanel } from '@codemirror/search';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, syntaxTree } from '@codemirror/language';
-import { oneDark } from '@codemirror/theme-one-dark';
+import { bracketMatching, syntaxTree } from '@codemirror/language';
 
+import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
@@ -27,7 +25,7 @@ import { Note } from '../../core/models/note.model';
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor-wrapper">
@@ -57,7 +55,7 @@ import { Note } from '../../core/models/note.model';
   `,
   styleUrls: ['./editor.component.scss'],
 })
-export class EditorComponent implements OnInit, OnDestroy, OnChanges {
+export class EditorComponent implements OnDestroy, OnChanges {
   @Input() noteId: number | null = null;
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
 
@@ -71,8 +69,6 @@ export class EditorComponent implements OnInit, OnDestroy, OnChanges {
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
 
-  ngOnInit(): void {}
-
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['noteId']) {
       this.loadNote(this.noteId);
@@ -85,14 +81,8 @@ export class EditorComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private async loadNote(id: number | null): Promise<void> {
-    // Save current note before switching
-    if (this.saveDebounce) {
-      clearTimeout(this.saveDebounce);
-      const cur = this.activeNote();
-      if (cur && this.editorView) {
-        await this.saveNote(cur.id, this.editorView.state.doc.toString());
-      }
-    }
+    // Always flush pending save before switching notes
+    await this.flushPendingSave();
 
     if (id === null) {
       this.activeNote.set(null);
@@ -100,11 +90,25 @@ export class EditorComponent implements OnInit, OnDestroy, OnChanges {
       return;
     }
 
-    const note = await this.notes.getById(id);
-    this.activeNote.set(note);
+    try {
+      const note = await this.notes.getById(id);
+      this.activeNote.set(note);
+      // Wait for DOM to update
+      setTimeout(() => this.initEditor(note?.content ?? ''), 0);
+    } catch (err) {
+      console.error('[Editor] Failed to load note:', err);
+    }
+  }
 
-    // Wait for DOM to update
-    setTimeout(() => this.initEditor(note?.content ?? ''), 0);
+  private async flushPendingSave(): Promise<void> {
+    if (this.saveDebounce) {
+      clearTimeout(this.saveDebounce);
+      this.saveDebounce = null;
+      const cur = this.activeNote();
+      if (cur && this.editorView) {
+        await this.saveNote(cur.id, this.editorView.state.doc.toString());
+      }
+    }
   }
 
   private destroyEditor(): void {
@@ -195,8 +199,7 @@ export class EditorComponent implements OnInit, OnDestroy, OnChanges {
         base: markdownLanguage,
         codeLanguages: languages,
       }),
-      syntaxHighlighting(defaultHighlightStyle),
-      oneDark,
+      vscodeDarkModern,
       evnoteTheme,
       markdownDecorationTheme,
       markdownDecorationPlugin,
@@ -300,11 +303,15 @@ export class EditorComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private async saveNote(id: number, content: string): Promise<void> {
-    const title = this.notes.extractTitle(content);
-    await this.notes.update(id, { content, title });
-    this.tabs.markDirty(id, false);
-    this.tabs.updateTitle(id, title || 'Untitled');
-    this.activeNote.update(n => n ? { ...n, title, content } : n);
+    try {
+      const title = this.notes.extractTitle(content);
+      await this.notes.update(id, { content, title });
+      this.tabs.markDirty(id, false);
+      this.tabs.updateTitle(id, title || 'Untitled');
+      this.activeNote.update(n => n ? { ...n, title, content } : n);
+    } catch (err) {
+      console.error('[Editor] Failed to save note:', err);
+    }
   }
 
   openSearch(): void {

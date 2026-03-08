@@ -19,6 +19,7 @@ export interface Tab {
   noteId: number;
   title: string;
   isDirty: boolean;
+  isPinned: boolean;
 }
 
 export type PaletteMode = 'command' | 'search' | 'tag';

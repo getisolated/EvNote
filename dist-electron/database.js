@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.noteOps = void 0;
 exports.initDatabase = initDatabase;
+exports.closeDatabase = closeDatabase;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path = __importStar(require("path"));
 const electron_1 = require("electron");
@@ -77,6 +78,20 @@ function initDatabase() {
       INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
     END;
   `);
+}
+function closeDatabase() {
+    if (db) {
+        db.close();
+    }
+}
+/** Escapes special FTS5 characters so user input is treated as literal text. */
+function sanitizeFtsQuery(query) {
+    return query
+        .trim()
+        .split(/\s+/)
+        .filter(token => token.length > 0)
+        .map(token => `"${token.replace(/"/g, '""')}"`)
+        .join(' ');
 }
 exports.noteOps = {
     getAll() {
@@ -118,17 +133,21 @@ exports.noteOps = {
     search(query) {
         if (!query.trim())
             return this.getAll();
+        const sanitized = sanitizeFtsQuery(query);
+        if (!sanitized)
+            return this.getAll();
         return db.prepare(`
       SELECT notes.* FROM notes
       JOIN notes_fts ON notes.id = notes_fts.rowid
       WHERE notes_fts MATCH ?
       ORDER BY rank
-    `).all(query.trim() + '*');
+    `).all(sanitized + '*');
     },
     getByTag(tag) {
+        const sanitizedTag = tag.replace(/"/g, '');
         return db.prepare(`
       SELECT * FROM notes WHERE tags LIKE ? ORDER BY updated_at DESC
-    `).all(`%"${tag}"%`);
+    `).all(`%"${sanitizedTag}"%`);
     },
     getAllTags() {
         const rows = db.prepare(`SELECT tags FROM notes`).all();
@@ -138,7 +157,7 @@ exports.noteOps = {
                 const tags = JSON.parse(row.tags);
                 tags.forEach(t => tagSet.add(t));
             }
-            catch { /* skip */ }
+            catch { /* skip malformed tags */ }
         }
         return Array.from(tagSet).sort();
     }

@@ -22,15 +22,21 @@ export class TabsService {
     return this.activeTab()?.noteId ?? null;
   });
 
+  /** Number of pinned tabs (always at the start of the array). */
+  readonly pinnedCount = computed(() =>
+    this._tabs().filter(t => t.isPinned).length
+  );
+
   // ── Session persistence ────────────────────────────────────────────────────
 
-  /** Call after notes are loaded. Restores open tabs from localStorage. */
   restoreSession(validNoteIds: Set<number>): void {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { tabs: Tab[]; activeIndex: number };
-        const validTabs = parsed.tabs.filter(t => validNoteIds.has(t.noteId));
+        const validTabs = parsed.tabs
+          .filter(t => validNoteIds.has(t.noteId))
+          .map(t => ({ ...t, isPinned: t.isPinned ?? false }));
         if (validTabs.length > 0) {
           this._tabs.set(validTabs);
           const clamped = Math.min(Math.max(parsed.activeIndex, -1), validTabs.length - 1);
@@ -61,7 +67,7 @@ export class TabsService {
     if (existing >= 0) {
       this._activeIndex.set(existing);
     } else {
-      this._tabs.update(tabs => [...tabs, { noteId, title, isDirty: false }]);
+      this._tabs.update(tabs => [...tabs, { noteId, title, isDirty: false, isPinned: false }]);
       this._activeIndex.set(this._tabs().length - 1);
     }
     this.persist();
@@ -70,6 +76,8 @@ export class TabsService {
   closeTab(index: number): void {
     const tabs = this._tabs();
     if (index < 0 || index >= tabs.length) return;
+    // Cannot close a pinned tab
+    if (tabs[index].isPinned) return;
 
     this._tabs.update(t => t.filter((_, i) => i !== index));
 
@@ -127,6 +135,73 @@ export class TabsService {
     this._tabs.update(tabs =>
       tabs.map(t => t.noteId === noteId ? { ...t, title } : t)
     );
+    this.persist();
+  }
+
+  // ── Pin / Unpin ────────────────────────────────────────────────────────────
+
+  togglePin(index: number): void {
+    const tabs = this._tabs();
+    if (index < 0 || index >= tabs.length) return;
+    const tab = tabs[index];
+    const newPinned = !tab.isPinned;
+
+    // Update the pin state
+    const updated = tabs.map((t, i) => i === index ? { ...t, isPinned: newPinned } : t);
+
+    if (newPinned) {
+      // Move tab to end of pinned section
+      const [pinned] = updated.splice(index, 1);
+      const pinnedCount = updated.filter(t => t.isPinned).length;
+      updated.splice(pinnedCount, 0, pinned);
+      // Update active index to follow the moved tab
+      this._tabs.set(updated);
+      this._activeIndex.set(updated.findIndex(t => t.noteId === tab.noteId));
+    } else {
+      // Move tab to start of unpinned section (right after last pinned)
+      const [unpinned] = updated.splice(index, 1);
+      const pinnedCount = updated.filter(t => t.isPinned).length;
+      updated.splice(pinnedCount, 0, unpinned);
+      this._tabs.set(updated);
+      this._activeIndex.set(updated.findIndex(t => t.noteId === tab.noteId));
+    }
+    this.persist();
+  }
+
+  togglePinActiveTab(): void {
+    const idx = this._activeIndex();
+    if (idx >= 0) this.togglePin(idx);
+  }
+
+  isPinned(index: number): boolean {
+    const tabs = this._tabs();
+    return index >= 0 && index < tabs.length && tabs[index].isPinned;
+  }
+
+  // ── Drag reorder ───────────────────────────────────────────────────────────
+
+  moveTab(fromIndex: number, toIndex: number): void {
+    if (fromIndex === toIndex) return;
+    const tabs = [...this._tabs()];
+    if (fromIndex < 0 || fromIndex >= tabs.length) return;
+    if (toIndex < 0 || toIndex >= tabs.length) return;
+
+    const movingTab = tabs[fromIndex];
+    const targetTab = tabs[toIndex];
+
+    // Pinned tabs can only move within pinned zone, unpinned within unpinned zone
+    if (movingTab.isPinned !== targetTab.isPinned) return;
+
+    const activeNoteId = this.activeNoteId();
+    const [moved] = tabs.splice(fromIndex, 1);
+    tabs.splice(toIndex, 0, moved);
+    this._tabs.set(tabs);
+
+    // Keep active index following the active tab
+    if (activeNoteId !== null) {
+      const newIdx = tabs.findIndex(t => t.noteId === activeNoteId);
+      if (newIdx >= 0) this._activeIndex.set(newIdx);
+    }
     this.persist();
   }
 }

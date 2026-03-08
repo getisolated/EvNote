@@ -153,43 +153,44 @@ export const markdownDecorationPlugin = ViewPlugin.fromClass(
 );
 
 // Theme for markdown decorations
+// VS Code "Default Dark Modern" token colors
 export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-md-h1': {
     fontSize: '1.6em',
     fontWeight: '700',
     lineHeight: '1.3',
-    color: '#d4d4d4 !important',
+    color: '#569cd6 !important',
   },
   '.cm-md-h2': {
     fontSize: '1.35em',
     fontWeight: '700',
-    color: '#d4d4d4 !important',
+    color: '#569cd6 !important',
   },
   '.cm-md-h3': {
     fontSize: '1.15em',
     fontWeight: '600',
-    color: '#d4d4d4 !important',
+    color: '#569cd6 !important',
   },
   '.cm-md-h4': {
     fontSize: '1em',
     fontWeight: '600',
-    color: '#d4d4d4 !important',
+    color: '#569cd6 !important',
   },
   '.cm-md-mark-hidden': {
-    color: '#555 !important',
+    color: '#3e4a57 !important',
     fontSize: '0.75em',
   },
   '.cm-md-bold': {
     fontWeight: '700',
-    color: '#d4d4d4',
+    color: '#569cd6',
   },
   '.cm-md-italic': {
     fontStyle: 'italic',
-    color: '#d4d4d4',
+    color: '#569cd6',
   },
   '.cm-md-strike': {
     textDecoration: 'line-through',
-    color: '#858585',
+    color: '#6a6a6a',
   },
   '.cm-md-inline-code': {
     fontFamily: 'Consolas, "Courier New", monospace',
@@ -204,18 +205,18 @@ export const markdownDecorationTheme = EditorView.baseTheme({
     fontSize: '0.88em',
   },
   '.cm-md-hr': {
-    color: '#555',
-    borderBottom: '1px solid #555',
+    color: '#3e3e3e',
+    borderBottom: '1px solid #3e3e3e',
     display: 'block',
   },
   '.cm-md-blockquote': {
-    borderLeft: '3px solid #569cd6',
+    borderLeft: '3px solid #6a9955',
     paddingLeft: '8px',
-    color: '#858585',
+    color: '#6a9955',
     fontStyle: 'italic',
   },
   '.cm-md-link': {
-    color: '#4daafc',
+    color: '#3794ff',
     textDecoration: 'underline',
   },
   '.cm-checkbox-wrap': {

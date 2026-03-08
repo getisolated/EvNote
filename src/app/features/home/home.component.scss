@@ -8,7 +8,7 @@
 .home {
   flex: 1;
   overflow-y: auto;
-  background: #282c34;
+  background: #1e1e1e;
   padding: 40px 48px;
   font-family: 'Segoe UI', system-ui, sans-serif;
 
@@ -19,6 +19,17 @@
   &::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
 }
 
+.home-inner {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+// ── Home Brand ──────────────────────────────────────────────────────────────
+.home-brand {
+  display: flex;
+  gap: 12px;
+}
+
 // ── Header ────────────────────────────────────────────────────────────────────
 
 .home-header {
@@ -26,7 +37,6 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
-  max-width: 860px;
 }
 
 .home-title {
@@ -71,7 +81,6 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 20px;
-  max-width: 860px;
 }
 
 .tag-filter {
@@ -100,7 +109,6 @@
 // ── Notes list ────────────────────────────────────────────────────────────────
 
 .notes-list {
-  max-width: 860px;
   border: 1px solid #2d2d2d;
   border-radius: 8px;
   overflow: hidden;

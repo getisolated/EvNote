@@ -13,6 +13,17 @@ export interface NoteRow {
 
 let db: Database.Database;
 
+// Cached prepared statements (initialized after DB open)
+let stmts: {
+  getAll: Database.Statement;
+  getById: Database.Statement;
+  create: Database.Statement;
+  delete: Database.Statement;
+  search: Database.Statement;
+  getByTag: Database.Statement;
+  getAllTags: Database.Statement;
+};
+
 export function initDatabase(): void {
   const dbPath = path.join(app.getPath('userData'), 'evnote.db');
   db = new Database(dbPath);
@@ -49,6 +60,22 @@ export function initDatabase(): void {
       INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
     END;
   `);
+
+  // Cache prepared statements after schema is ready
+  stmts = {
+    getAll: db.prepare('SELECT * FROM notes ORDER BY updated_at DESC'),
+    getById: db.prepare('SELECT * FROM notes WHERE id = ?'),
+    create: db.prepare("INSERT INTO notes (title, content, tags) VALUES (?, ?, '[]')"),
+    delete: db.prepare('DELETE FROM notes WHERE id = ?'),
+    search: db.prepare(`
+      SELECT notes.* FROM notes
+      JOIN notes_fts ON notes.id = notes_fts.rowid
+      WHERE notes_fts MATCH ?
+      ORDER BY rank
+    `),
+    getByTag: db.prepare("SELECT * FROM notes WHERE tags LIKE ? ESCAPE '\\' ORDER BY updated_at DESC"),
+    getAllTags: db.prepare('SELECT tags FROM notes'),
+  };
 }
 
 export function closeDatabase(): void {
@@ -67,20 +94,25 @@ function sanitizeFtsQuery(query: string): string {
     .join(' ');
 }
 
+/** Escapes LIKE wildcards so user input is treated as literal text. */
+function escapeLike(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
+}
+
 export const noteOps = {
   getAll(): NoteRow[] {
-    return db.prepare(`SELECT * FROM notes ORDER BY updated_at DESC`).all() as NoteRow[];
+    return stmts.getAll.all() as NoteRow[];
   },
 
   getById(id: number): NoteRow | undefined {
-    return db.prepare(`SELECT * FROM notes WHERE id = ?`).get(id) as NoteRow | undefined;
+    return stmts.getById.get(id) as NoteRow | undefined;
   },
 
   create(title: string, content: string): NoteRow {
-    const stmt = db.prepare(
-      `INSERT INTO notes (title, content, tags) VALUES (?, ?, '[]')`
-    );
-    const result = stmt.run(title, content);
+    const result = stmts.create.run(title, content);
     return this.getById(result.lastInsertRowid as number)!;
   },
 
@@ -94,7 +126,7 @@ export const noteOps = {
 
     if (fields.length === 0) return this.getById(id);
 
-    fields.push(`updated_at = datetime('now')`);
+    fields.push("updated_at = datetime('now')");
     values.push(id);
 
     db.prepare(`UPDATE notes SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -102,30 +134,23 @@ export const noteOps = {
   },
 
   delete(id: number): void {
-    db.prepare(`DELETE FROM notes WHERE id = ?`).run(id);
+    stmts.delete.run(id);
   },
 
   search(query: string): NoteRow[] {
     if (!query.trim()) return this.getAll();
     const sanitized = sanitizeFtsQuery(query);
     if (!sanitized) return this.getAll();
-    return db.prepare(`
-      SELECT notes.* FROM notes
-      JOIN notes_fts ON notes.id = notes_fts.rowid
-      WHERE notes_fts MATCH ?
-      ORDER BY rank
-    `).all(sanitized + '*') as NoteRow[];
+    return stmts.search.all(sanitized + '*') as NoteRow[];
   },
 
   getByTag(tag: string): NoteRow[] {
-    const sanitizedTag = tag.replace(/"/g, '');
-    return db.prepare(`
-      SELECT * FROM notes WHERE tags LIKE ? ORDER BY updated_at DESC
-    `).all(`%"${sanitizedTag}"%`) as NoteRow[];
+    const escaped = escapeLike(tag.replace(/"/g, ''));
+    return stmts.getByTag.all(`%"${escaped}"%`) as NoteRow[];
   },
 
   getAllTags(): string[] {
-    const rows = db.prepare(`SELECT tags FROM notes`).all() as { tags: string }[];
+    const rows = stmts.getAllTags.all() as { tags: string }[];
     const tagSet = new Set<string>();
     for (const row of rows) {
       try {

@@ -1,6 +1,6 @@
 import {
   Component, Input, Output, EventEmitter, HostListener,
-  ChangeDetectionStrategy, signal, ElementRef, inject, OnInit
+  ChangeDetectionStrategy, signal, ElementRef, inject, OnInit, OnDestroy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -104,7 +104,7 @@ export function isDivider(entry: ContextMenuEntry): entry is ContextMenuDivider 
   `,
   styleUrls: ['./context-menu.component.scss'],
 })
-export class ContextMenuComponent implements OnInit {
+export class ContextMenuComponent implements OnInit, OnDestroy {
   @Input() items: ContextMenuEntry[] = [];
   @Input() x = 0;
   @Input() y = 0;
@@ -112,6 +112,7 @@ export class ContextMenuComponent implements OnInit {
   @Output() action = new EventEmitter<string>();
 
   private el = inject(ElementRef);
+  private submenuTimeout: ReturnType<typeof setTimeout> | null = null;
 
   readonly posX = signal(0);
   readonly posY = signal(0);
@@ -148,11 +149,16 @@ export class ContextMenuComponent implements OnInit {
   }
 
   onItemEnter(index: number): void {
+    if (this.submenuTimeout) { clearTimeout(this.submenuTimeout); this.submenuTimeout = null; }
     this.activeSubmenu.set(index);
   }
 
   onItemLeave(): void {
-    // Small delay before closing submenu to allow mouse to reach it
-    setTimeout(() => this.activeSubmenu.set(null), 150);
+    if (this.submenuTimeout) clearTimeout(this.submenuTimeout);
+    this.submenuTimeout = setTimeout(() => this.activeSubmenu.set(null), 150);
+  }
+
+  ngOnDestroy(): void {
+    if (this.submenuTimeout) clearTimeout(this.submenuTimeout);
   }
 }

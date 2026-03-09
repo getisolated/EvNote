@@ -19,6 +19,7 @@ export class PaletteService {
 
   close(): void {
     this._isOpen.set(false);
+    this._initialQuery.set('');
   }
 
   toggle(mode: PaletteMode = 'command'): void {

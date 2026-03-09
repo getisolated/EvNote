@@ -68,6 +68,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private editorView: EditorView | null = null;
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
   private isUpdatingFromModel = false;
+  private loadGeneration = 0;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['noteId']) {
@@ -81,8 +82,13 @@ export class EditorComponent implements OnDestroy, OnChanges {
   }
 
   private async loadNote(id: number | null): Promise<void> {
+    const generation = ++this.loadGeneration;
+
     // Always flush pending save before switching notes
     await this.flushPendingSave();
+
+    // Abort if a newer load was started while flushing
+    if (generation !== this.loadGeneration) return;
 
     if (id === null) {
       this.activeNote.set(null);
@@ -92,9 +98,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     try {
       const note = await this.notes.getById(id);
+      // Abort if a newer load was started while fetching
+      if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
       // Wait for DOM to update
-      setTimeout(() => this.initEditor(note?.content ?? ''), 0);
+      setTimeout(() => {
+        if (generation !== this.loadGeneration) return;
+        this.initEditor(note?.content ?? '');
+      }, 0);
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
     }

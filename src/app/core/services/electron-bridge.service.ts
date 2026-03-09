@@ -1,23 +1,35 @@
 import { Injectable } from '@angular/core';
 import { Note } from '../models/note.model';
 
+/** Raw row shape returned by the Electron main process (snake_case from SQLite). */
+interface NoteRow {
+  id: number;
+  title: string;
+  content: string;
+  tags: string | string[];
+  created_at?: string;
+  createdAt?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
 interface ElectronAPI {
   minimize: () => Promise<void>;
   maximize: () => Promise<void>;
   close: () => Promise<void>;
   isMaximized: () => Promise<boolean>;
-  getAllNotes: () => Promise<Note[]>;
-  getNoteById: (id: number) => Promise<Note | null>;
-  createNote: (title: string, content: string) => Promise<Note>;
-  updateNote: (id: number, data: { title?: string; content?: string; tags?: string }) => Promise<Note | null>;
+  getAllNotes: () => Promise<NoteRow[]>;
+  getNoteById: (id: number) => Promise<NoteRow | null>;
+  createNote: (title: string, content: string) => Promise<NoteRow>;
+  updateNote: (id: number, data: { title?: string; content?: string; tags?: string }) => Promise<NoteRow | null>;
   deleteNote: (id: number) => Promise<boolean>;
-  searchNotes: (query: string) => Promise<Note[]>;
-  getNotesByTag: (tag: string) => Promise<Note[]>;
+  searchNotes: (query: string) => Promise<NoteRow[]>;
+  getNotesByTag: (tag: string) => Promise<NoteRow[]>;
   getAllTags: () => Promise<string[]>;
   openExternal: (url: string) => Promise<void>;
 }
 
-function mapRow(row: any): Note {
+function mapRow(row: NoteRow): Note {
   return {
     id: row.id,
     title: row.title,
@@ -30,8 +42,9 @@ function mapRow(row: any): Note {
 
 @Injectable({ providedIn: 'root' })
 export class ElectronBridgeService {
-  private readonly isElectron = !!(window as any)['electronAPI'];
-  private readonly api: ElectronAPI | null = (window as any)['electronAPI'] ?? null;
+  private readonly isElectron = !!((window as unknown as Record<string, unknown>)['electronAPI']);
+  private readonly api: ElectronAPI | null =
+    ((window as unknown as Record<string, unknown>)['electronAPI'] as ElectronAPI | undefined) ?? null;
 
   get inElectron(): boolean { return this.isElectron; }
 

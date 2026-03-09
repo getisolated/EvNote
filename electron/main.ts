@@ -19,7 +19,7 @@ function createWindow(): void {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -87,4 +87,9 @@ safeHandle('notes:byTag', (_e, tag: string) => noteOps.getByTag(tag));
 safeHandle('notes:allTags', () => noteOps.getAllTags());
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-safeHandle('shell:openExternal', (_e, url: string) => shell.openExternal(url));
+safeHandle('shell:openExternal', (_e, url: string) => {
+  if (typeof url !== 'string' || !(url.startsWith('http://') || url.startsWith('https://'))) {
+    throw new Error('Only http:// and https:// URLs are allowed');
+  }
+  return shell.openExternal(url);
+});

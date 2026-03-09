@@ -91,8 +91,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async seedSampleNotes(): Promise<void> {
     for (const sample of SAMPLE_NOTES) {
-      const note = await this.bridge.createNote(sample.title, sample.content);
-      await this.bridge.updateNote(note.id, { title: sample.title, content: sample.content });
+      await this.bridge.createNote(sample.title, sample.content);
     }
     await this.notesService.loadAll();
   }

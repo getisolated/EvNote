@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { Note, NotePreview } from '../models/note.model';
+import { Note, NotePreview, Backlink } from '../models/note.model';
 import { ElectronBridgeService } from './electron-bridge.service';
 
 const PREVIEW_MAX_LENGTH = 120;
@@ -74,5 +74,20 @@ export class NotesService {
   extractTitle(content: string): string {
     const firstLine = content.split('\n')[0] ?? '';
     return firstLine.replace(/^#+\s*/, '').trim() || 'Untitled';
+  }
+
+  // Links / Backlinks
+  async getBacklinks(noteId: number): Promise<Backlink[]> {
+    return this.bridge.getBacklinks(noteId);
+  }
+
+  async findByTitle(title: string): Promise<number | null> {
+    return this.bridge.findNoteByTitle(title);
+  }
+
+  async createWithTitle(title: string): Promise<Note> {
+    const note = await this.bridge.createNote(title, `# ${title}\n`);
+    this._notes.update(list => [note, ...list]);
+    return note;
   }
 }

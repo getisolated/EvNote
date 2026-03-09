@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Note } from '../models/note.model';
+import { Note, Backlink } from '../models/note.model';
 
 /** Raw row shape returned by the Electron main process (snake_case from SQLite). */
 interface NoteRow {
@@ -26,6 +26,9 @@ interface ElectronAPI {
   searchNotes: (query: string) => Promise<NoteRow[]>;
   getNotesByTag: (tag: string) => Promise<NoteRow[]>;
   getAllTags: () => Promise<string[]>;
+  getBacklinks: (noteId: number) => Promise<Backlink[]>;
+  findNoteByTitle: (title: string) => Promise<number | null>;
+  rebuildLinks: () => Promise<boolean>;
   openExternal: (url: string) => Promise<void>;
 }
 
@@ -103,5 +106,21 @@ export class ElectronBridgeService {
   async getAllTags(): Promise<string[]> {
     if (!this.api) return [];
     return this.api.getAllTags();
+  }
+
+  // Links / Backlinks
+  async getBacklinks(noteId: number): Promise<Backlink[]> {
+    if (!this.api) return [];
+    return this.api.getBacklinks(noteId);
+  }
+
+  async findNoteByTitle(title: string): Promise<number | null> {
+    if (!this.api) return null;
+    return this.api.findNoteByTitle(title);
+  }
+
+  async rebuildLinks(): Promise<boolean> {
+    if (!this.api) return false;
+    return this.api.rebuildLinks();
   }
 }

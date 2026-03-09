@@ -81,6 +81,9 @@ export class AppComponent implements OnInit, OnDestroy {
         await this.seedSampleNotes();
       }
 
+      // Rebuild links table (idempotent, handles migration)
+      await this.bridge.rebuildLinks();
+
       const noteIds = new Set(this.notesService.notes().map(n => n.id));
       this.tabsService.restoreSession(noteIds);
     } catch (err) {

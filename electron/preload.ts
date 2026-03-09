@@ -19,6 +19,11 @@ const api = {
   getNotesByTag: (tag: string) => ipcRenderer.invoke('notes:byTag', tag),
   getAllTags: () => ipcRenderer.invoke('notes:allTags'),
 
+  // Links / Backlinks
+  getBacklinks: (noteId: number) => ipcRenderer.invoke('notes:backlinks', noteId),
+  findNoteByTitle: (title: string) => ipcRenderer.invoke('notes:findByTitle', title),
+  rebuildLinks: () => ipcRenderer.invoke('notes:rebuildLinks'),
+
   // Shell
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 };

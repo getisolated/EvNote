@@ -96,8 +96,30 @@ function buildDecorations(view: EditorView): DecorationSet {
     }
   });
 
-  // ── Task list items via regex ─────────────────────────────────────────────
+  // ── Wikilinks [[...]] via regex ──────────────────────────────────────────
   const text = doc.toString();
+  const wikilinkRegex = /\[\[([^\]]+)\]\]/g;
+  let wlMatch: RegExpExecArray | null;
+
+  while ((wlMatch = wikilinkRegex.exec(text)) !== null) {
+    const fullFrom = wlMatch.index;          // start of [[
+    const fullTo = fullFrom + wlMatch[0].length; // end of ]]
+    const inCursor = cursorInRange(view, fullFrom, fullTo);
+
+    if (inCursor) {
+      // Cursor inside: show raw syntax but style the brackets
+      pending.push({ from: fullFrom, to: fullFrom + 2, deco: Decoration.mark({ class: 'cm-wikilink-bracket' }) });
+      pending.push({ from: fullFrom + 2, to: fullTo - 2, deco: Decoration.mark({ class: 'cm-wikilink-title-editing' }) });
+      pending.push({ from: fullTo - 2, to: fullTo, deco: Decoration.mark({ class: 'cm-wikilink-bracket' }) });
+    } else {
+      // Cursor outside: hide brackets, show styled title
+      pending.push({ from: fullFrom, to: fullFrom + 2, deco: Decoration.mark({ class: 'cm-wikilink-bracket-hidden' }) });
+      pending.push({ from: fullFrom + 2, to: fullTo - 2, deco: Decoration.mark({ class: 'cm-wikilink-title' }) });
+      pending.push({ from: fullTo - 2, to: fullTo, deco: Decoration.mark({ class: 'cm-wikilink-bracket-hidden' }) });
+    }
+  }
+
+  // ── Task list items via regex ─────────────────────────────────────────────
   const taskRegex = /^(\s*(?:[-*+]\s+)?)((\[ \]|\[x\]|\( \)|\(x\)))\s/gm;
   let match: RegExpExecArray | null;
 
@@ -246,5 +268,27 @@ export const markdownDecorationTheme = EditorView.baseTheme({
   },
   '.cm-hidden-mark': {
     display: 'none',
+  },
+  // ── Wikilinks ──────────────────────────────────────────────────────
+  '.cm-wikilink-bracket': {
+    color: '#4e5579',
+    fontSize: '0.85em',
+  },
+  '.cm-wikilink-bracket-hidden': {
+    fontSize: '0',
+    overflow: 'hidden',
+    width: '0',
+    display: 'inline-block',
+  },
+  '.cm-wikilink-title': {
+    color: '#9cdcfe',
+    cursor: 'pointer',
+    borderBottom: '1px solid rgba(156, 220, 254, 0.3)',
+    '&:hover': {
+      borderBottomColor: '#9cdcfe',
+    },
+  },
+  '.cm-wikilink-title-editing': {
+    color: '#9cdcfe',
   },
 });

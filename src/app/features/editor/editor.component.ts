@@ -1,6 +1,6 @@
 import {
   Component, OnDestroy, OnChanges, Input, SimpleChanges,
-  ElementRef, ViewChild, inject, ChangeDetectionStrategy, NgZone, signal
+  ElementRef, ViewChild, inject, ChangeDetectionStrategy, NgZone, signal, Output, EventEmitter
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
@@ -11,16 +11,17 @@ import {
   defaultKeymap, history, historyKeymap, indentWithTab,
 } from '@codemirror/commands';
 import { searchKeymap, search, openSearchPanel, closeSearchPanel } from '@codemirror/search';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { bracketMatching, syntaxTree } from '@codemirror/language';
 
 import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
+import { wikilinkCompletion, wikilinkCompletionTheme } from '../../shared/codemirror/wikilink-completion';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
-import { Note } from '../../core/models/note.model';
+import { Note, Backlink } from '../../core/models/note.model';
 
 @Component({
   selector: 'app-editor',
@@ -31,6 +32,36 @@ import { Note } from '../../core/models/note.model';
     <div class="editor-wrapper">
       @if (activeNote()) {
         <div class="editor-host" #editorHost></div>
+
+        <!-- Backlinks panel -->
+        <div class="backlinks-panel" [class.collapsed]="backlinksCollapsed()">
+          <button class="backlinks-toggle" (click)="toggleBacklinks()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline [attr.points]="backlinksCollapsed() ? '6 9 12 15 18 9' : '18 15 12 9 6 15'"/>
+            </svg>
+            <span class="backlinks-label">Linked mentions</span>
+            <span class="backlinks-count">{{ backlinks().length }}</span>
+          </button>
+          @if (!backlinksCollapsed()) {
+            <div class="backlinks-list">
+              @if (backlinks().length === 0) {
+                <div class="backlinks-empty">No notes link to this one yet.</div>
+              }
+              @for (bl of backlinks(); track bl.id) {
+                <button class="backlink-item" (click)="openBacklink(bl)">
+                  <svg class="backlink-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <div class="backlink-content">
+                    <span class="backlink-title">{{ bl.title || 'Untitled' }}</span>
+                    <span class="backlink-preview">{{ bl.preview }}</span>
+                  </div>
+                </button>
+              }
+            </div>
+          }
+        </div>
       } @else {
         <div class="editor-empty">
           <div class="empty-content">
@@ -57,6 +88,7 @@ import { Note } from '../../core/models/note.model';
 })
 export class EditorComponent implements OnDestroy, OnChanges {
   @Input() noteId: number | null = null;
+  @Output() wikilinkNavigate = new EventEmitter<{ noteId: number; title: string }>();
   @ViewChild('editorHost') editorHost!: ElementRef<HTMLElement>;
 
   private notes = inject(NotesService);
@@ -64,6 +96,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
   private zone = inject(NgZone);
 
   readonly activeNote = signal<Note | null>(null);
+  readonly backlinks = signal<Backlink[]>([]);
+  readonly backlinksCollapsed = signal(false);
 
   private editorView: EditorView | null = null;
   private saveDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -92,6 +126,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
     if (id === null) {
       this.activeNote.set(null);
+      this.backlinks.set([]);
       this.destroyEditor();
       return;
     }
@@ -101,6 +136,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       // Abort if a newer load was started while fetching
       if (generation !== this.loadGeneration) return;
       this.activeNote.set(note);
+      await this.loadBacklinks(id);
+      if (generation !== this.loadGeneration) return;
       // Wait for DOM to update
       setTimeout(() => {
         if (generation !== this.loadGeneration) return;
@@ -109,6 +146,27 @@ export class EditorComponent implements OnDestroy, OnChanges {
     } catch (err) {
       console.error('[Editor] Failed to load note:', err);
     }
+  }
+
+  private async loadBacklinks(noteId: number): Promise<void> {
+    try {
+      const bls = await this.notes.getBacklinks(noteId);
+      // IPC responses via contextBridge return native Promises (not Zone-patched),
+      // so the resolution runs outside Angular's zone. We must re-enter the zone
+      // to trigger change detection for OnPush components.
+      this.zone.run(() => this.backlinks.set(bls));
+    } catch (err) {
+      console.error('[Editor] Failed to load backlinks:', err);
+      this.zone.run(() => this.backlinks.set([]));
+    }
+  }
+
+  toggleBacklinks(): void {
+    this.backlinksCollapsed.update(v => !v);
+  }
+
+  openBacklink(bl: Backlink): void {
+    this.tabs.openNote(bl.id, bl.title || 'Untitled');
   }
 
   private async flushPendingSave(): Promise<void> {
@@ -149,6 +207,47 @@ export class EditorComponent implements OnDestroy, OnChanges {
         self.saveDebounce = setTimeout(() => {
           self.zone.run(() => self.saveNote(note.id, content));
         }, 1000);
+      }
+    });
+
+    // Handle clicks on [[wikilinks]]
+    // - Plain click on rendered link (brackets hidden) → navigate
+    // - Ctrl+Click on link title while editing (brackets visible) → navigate
+    //
+    // Note: between mousedown and click, CodeMirror moves the cursor which
+    // rebuilds decorations. The original <span> (event.target) is detached
+    // from the DOM, so we use posAtCoords instead of posAtDOM.
+    const wikilinkClickHandler = EditorView.domEventHandlers({
+      click(event: MouseEvent, view: EditorView) {
+        const target = event.target as HTMLElement;
+        // Check classes on the (possibly detached) original target element
+        const isRenderedLink = target.classList.contains('cm-wikilink-title');
+        const isEditingLink = event.ctrlKey && target.classList.contains('cm-wikilink-title-editing');
+
+        if (!isRenderedLink && !isEditingLink) return false;
+
+        // Use coordinates — target element may be detached from DOM after decoration rebuild
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null) return false;
+
+        const doc = view.state.doc.toString();
+
+        // Find the [[...]] surrounding this position
+        const searchFrom = Math.max(0, pos - 200);
+        const textBefore = doc.slice(searchFrom, pos + 1);
+        const openIdx = textBefore.lastIndexOf('[[');
+        if (openIdx === -1) return false;
+
+        const absOpen = searchFrom + openIdx;
+        const closeIdx = doc.indexOf(']]', absOpen + 2);
+        if (closeIdx === -1 || pos > closeIdx + 2) return false;
+
+        const linkTitle = doc.slice(absOpen + 2, closeIdx).trim();
+        if (!linkTitle) return false;
+
+        event.preventDefault();
+        self.zone.run(() => self.navigateToWikilink(linkTitle));
+        return true;
       }
     });
 
@@ -219,7 +318,14 @@ export class EditorComponent implements OnDestroy, OnChanges {
       highlightActiveLine(),
       bracketMatching(),
       search({ top: false }),
+      wikilinkClickHandler,
+      wikilinkCompletion(
+        () => self.notes.notes().map(n => ({ id: n.id, title: n.title })),
+        () => self.activeNote()?.id ?? null,
+      ),
+      wikilinkCompletionTheme,
       keymap.of([
+        ...completionKeymap,
         ...closeBracketsKeymap,
         ...defaultKeymap,
         ...historyKeymap,
@@ -313,6 +419,24 @@ export class EditorComponent implements OnDestroy, OnChanges {
     setTimeout(() => this.editorView?.focus(), 50);
   }
 
+  /** Navigate to a [[wikilink]] target: open existing note or create a new one. */
+  private async navigateToWikilink(title: string): Promise<void> {
+    try {
+      // Try to find existing note by title (case-insensitive)
+      let targetId = await this.notes.findByTitle(title);
+
+      if (targetId === null) {
+        // Create a new note with this title
+        const newNote = await this.notes.createWithTitle(title);
+        targetId = newNote.id;
+      }
+
+      this.tabs.openNote(targetId, title);
+    } catch (err) {
+      console.error('[Editor] Failed to navigate to wikilink:', err);
+    }
+  }
+
   private async saveNote(id: number, content: string): Promise<void> {
     try {
       const title = this.notes.extractTitle(content);
@@ -320,6 +444,8 @@ export class EditorComponent implements OnDestroy, OnChanges {
       this.tabs.markDirty(id, false);
       this.tabs.updateTitle(id, title || 'Untitled');
       this.activeNote.update(n => n ? { ...n, title, content } : n);
+      // Refresh backlinks after save (links may have changed)
+      this.loadBacklinks(id);
     } catch (err) {
       console.error('[Editor] Failed to save note:', err);
     }

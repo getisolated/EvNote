@@ -15,6 +15,12 @@ export interface NotePreview {
   preview: string;
 }
 
+export interface Backlink {
+  id: number;
+  title: string;
+  preview: string;
+}
+
 export interface Tab {
   noteId: number;
   title: string;

@@ -2,6 +2,7 @@
   "name": "everything-note",
   "version": "0.0.8",
   "description": "Fast, keyboard-driven note-taking app",
+  "author": "Yassine Debbih",
   "main": "dist-electron/main.js",
   "private": true,
   "scripts": {
@@ -75,8 +76,7 @@
       "signtoolOptions": {
         "signingHashAlgorithms": [
           "sha256"
-        ],
-        "signDlls": true
+        ]
       }
     },
     "nsis": {

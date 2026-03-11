@@ -18,6 +18,7 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 
 import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
+import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
 import { Note } from '../../core/models/note.model';
@@ -212,6 +213,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
       evnoteTheme,
       markdownDecorationTheme,
       markdownDecorationPlugin,
+      ...slashCommandExtensions,
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),

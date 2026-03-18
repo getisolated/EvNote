@@ -100,6 +100,10 @@ export class ElectronBridgeService {
     return rows.map(mapRow);
   }
 
+  openExternal(url: string): Promise<void> {
+    return this.api?.openExternal(url) ?? Promise.resolve();
+  }
+
   async getAllTags(): Promise<string[]> {
     if (!this.api) return [];
     return this.api.getAllTags();

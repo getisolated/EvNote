@@ -139,9 +139,52 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
 
         // ── Links ─────────────────────────────────────────────────
-        case 'Link':
-          pending.push({ from, to, deco: Decoration.mark({ class: 'cm-md-link' }) });
+        case 'Link': {
+          const linkText = doc.sliceString(from, to);
+          const isNoteLink = linkText.includes('note://');
+          const linkClass = isNoteLink ? 'cm-md-note-link' : 'cm-md-link';
+
+          if (!inCursor) {
+            // Hide link syntax: show only the text between [ and ]
+            // Find the positions of [ ] ( )
+            const linkNode = node.node;
+            const children: { name: string; from: number; to: number }[] = [];
+            let child = linkNode.firstChild;
+            while (child) {
+              children.push({ name: child.name, from: child.from, to: child.to });
+              child = child.nextSibling;
+            }
+
+            // LinkMark nodes are: '[', ']', '(', ')'
+            // URL node contains the URL
+            // We want to hide everything except the link text content
+            let bracketOpen = -1;
+            let bracketClose = -1;
+
+            for (const c of children) {
+              if (c.name === 'LinkMark') {
+                const ch = doc.sliceString(c.from, c.to);
+                if (ch === '[') bracketOpen = c.from;
+                else if (ch === ']') bracketClose = c.from;
+              }
+            }
+
+            if (bracketOpen >= 0 && bracketClose >= 0) {
+              // Hide '[' at the start
+              pending.push({ from: bracketOpen, to: bracketOpen + 1, deco: Decoration.replace({}) });
+              // Style the text between brackets
+              pending.push({ from: bracketOpen + 1, to: bracketClose, deco: Decoration.mark({ class: linkClass }) });
+              // Hide '](url)' from ']' to end of link
+              pending.push({ from: bracketClose, to, deco: Decoration.replace({}) });
+            } else {
+              pending.push({ from, to, deco: Decoration.mark({ class: linkClass }) });
+            }
+          } else {
+            // Cursor is inside: show raw markdown with styling
+            pending.push({ from, to, deco: Decoration.mark({ class: linkClass }) });
+          }
           break;
+        }
       }
     }
   });
@@ -272,6 +315,14 @@ export const markdownDecorationTheme = EditorView.baseTheme({
   '.cm-md-link': {
     color: '#3794ff',
     textDecoration: 'underline',
+  },
+  '.cm-md-note-link': {
+    color: '#dcdcaa',
+    textDecoration: 'underline',
+    textDecorationStyle: 'dotted',
+  },
+  '&.cm-ctrl-held .cm-md-note-link, &.cm-ctrl-held .cm-md-link': {
+    cursor: 'pointer',
   },
   '.cm-checkbox-wrap': {
     display: 'inline-flex',

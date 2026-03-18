@@ -19,8 +19,10 @@ import { bracketMatching, syntaxTree } from '@codemirror/language';
 import { vscodeDarkModern } from '../../shared/codemirror/vscode-dark-modern';
 import { markdownDecorationPlugin, markdownDecorationTheme } from '../../shared/codemirror/markdown-decorations';
 import { slashCommandExtensions } from '../../shared/codemirror/slash-commands';
+import { noteLinkExtensions } from '../../shared/codemirror/note-link-completion';
 import { NotesService } from '../../core/services/notes.service';
 import { TabsService } from '../../core/services/tabs.service';
+import { ElectronBridgeService } from '../../core/services/electron-bridge.service';
 import { Note } from '../../core/models/note.model';
 
 @Component({
@@ -62,6 +64,7 @@ export class EditorComponent implements OnDestroy, OnChanges {
 
   private notes = inject(NotesService);
   private tabs = inject(TabsService);
+  private bridge = inject(ElectronBridgeService);
   private zone = inject(NgZone);
 
   readonly activeNote = signal<Note | null>(null);
@@ -214,6 +217,19 @@ export class EditorComponent implements OnDestroy, OnChanges {
       markdownDecorationTheme,
       markdownDecorationPlugin,
       ...slashCommandExtensions,
+      ...noteLinkExtensions({
+        getNotes: () => this.notes.notePreviews().map(n => ({
+          id: n.id,
+          title: n.title,
+          preview: n.preview,
+        })),
+        onOpenNote: (noteId, title) => {
+          this.zone.run(() => this.tabs.openNote(noteId, title));
+        },
+        onOpenExternal: (url) => {
+          this.bridge.openExternal(url);
+        },
+      }),
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),
